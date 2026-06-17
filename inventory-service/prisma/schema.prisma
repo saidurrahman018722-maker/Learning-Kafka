@@ -1,0 +1,31 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+// Get a free hosted Postgres database in seconds: `npx create-db`
+
+generator client {
+  provider = "prisma-client-js"
+  // output   = "../src/generated/prisma"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+model Product {
+  id            Int      @id @default(autoincrement())
+  name          String
+  sku           String   @unique // Stock Keeping Unit - good practice for inventory
+  price         Float
+  stockQuantity Int      @default(0)
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+}
+
+// OPTIONAL BUT RECOMMENDED: Idempotency table for Kafka
+// This prevents processing the exact same Kafka message twice if the service restarts
+model ProcessedEvent {
+  id        String   @id // The Kafka message ID or Order ID
+  topic     String
+  createdAt DateTime @default(now())
+}

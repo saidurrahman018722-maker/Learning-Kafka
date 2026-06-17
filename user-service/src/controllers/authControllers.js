@@ -3,6 +3,7 @@ import bcrypt from "bcryptjs";
 import jwt from "jsonwebtoken";
 import crypto from "crypto";
 import { generateRfreshToken } from "../utils/generateRefreshToken.js";
+import { producer } from "../utils/kalfka.js";
 
 export const register = async (req,res)=>{
     const {name,email,password} = req.body;
@@ -42,6 +43,22 @@ export const register = async (req,res)=>{
         user,
         acessToken
     })
+    const payload = {
+        id:user.id,
+        name:user.name,
+        email:user.email,
+        role:user.role,
+        action: "USER_REGISTERED",
+        timestamp: new Date().toISOString()
+    }
+    await producer.send({
+        topic:"user-registration",
+        messages:[{
+            key:user.id,
+            value:JSON.stringify(payload)
+        }]
+    })
+
 }
 
 
