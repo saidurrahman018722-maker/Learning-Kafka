@@ -8,7 +8,7 @@ export const createOrder = async (req,res)=>{
     data: {
         total,
         userId: req.user.id,
-        orderItem: { 
+        items: { 
         createMany: {
             data: items.map((item) => ({
             productId: item.productId,
@@ -18,7 +18,7 @@ export const createOrder = async (req,res)=>{
         },
     },
     include: {
-    orderItem: true, 
+    items: true, 
     },
     });
 
@@ -30,7 +30,8 @@ export const createOrder = async (req,res)=>{
     }
     const payload_2 = {
         orderId:order.id,
-        items:order.orderItem
+        
+        items: order.items.map(i => ({ productId: i.productId, quantity: i.quantity }))
     }
 
     try{
@@ -38,7 +39,7 @@ export const createOrder = async (req,res)=>{
         topic:"order-created",
         messages:[{
             key:order.id,
-            value:JSON.stringify(payload_2)
+            value:JSON.stringify({type:"OrderCreated",data:payload_2})
         }]
     })
     }catch(err){

@@ -78,3 +78,91 @@ export  const sendRegistrationWelcomeEmail = async (userEmail, userName) => {
     return false;
   }
 };
+
+
+export const sendOrderFailedForInventory = async (userEmail, userName, orderId, failedItems) => {
+  try {
+    // 1. Dynamically generate the HTML rows for the out-of-stock items
+    const itemsHtml = failedItems.map(item => `
+      <tr>
+        <td style="padding: 16px 12px; border-bottom: 1px solid #f0f0f0; font-size: 14px; color: #333333;">
+          <strong style="display: block; margin-bottom: 4px;">Product ID: ${item.productId}</strong>
+          <span style="color: #999999; font-size: 12px;">We currently only have ${item.available} in stock.</span>
+        </td>
+        <td style="padding: 16px 12px; border-bottom: 1px solid #f0f0f0; font-size: 14px; color: #ff6a00; text-align: right; font-weight: bold;">
+          Requested: ${item.requested}
+        </td>
+      </tr>
+    `).join('');
+
+    // 2. Send the email via Nodemailer
+    const info = await transporter.sendMail({
+      from: `"My E-Commerce Store" <${process.env.EMAIL_USER}>`,
+      to: userEmail,
+      subject: `Action Required: Update on Order #${orderId.substring(0, 8)}`,
+      text: `Hi ${userName},\n\nWe're sorry, but part of your order #${orderId} could not be fulfilled because some items are out of stock. Your payment has not been charged.\n\nBest,\nThe Support Team`,
+      
+      // 3. The Alibaba-inspired E-Commerce HTML Template
+      html: `
+      <div style="background-color: #f2f2f2; padding: 40px 20px; font-family: Arial, Helvetica, sans-serif;">
+        <div style="max-width: 600px; margin: 0 auto; background-color: #ffffff; overflow: hidden; border: 1px solid #e1e1e1;">
+          
+          <div style="background-color: #ff6a00; padding: 24px 40px; text-align: center;">
+            <h1 style="color: #ffffff; font-size: 24px; font-weight: bold; margin: 0; letter-spacing: 1px;">
+              ORDER UPDATE
+            </h1>
+          </div>
+          
+          <div style="padding: 40px;">
+            
+            <h2 style="color: #333333; font-size: 20px; font-weight: bold; margin-top: 0; margin-bottom: 16px;">
+              Hi ${userName},
+            </h2>
+            
+            <p style="color: #666666; font-size: 15px; line-height: 1.6; margin-top: 0; margin-bottom: 24px;">
+              We apologize, but we are unable to process your recent order because some of the items you requested are currently out of stock. <strong>Rest assured, your credit card has not been charged.</strong>
+            </p>
+            
+            <div style="background-color: #fcf8f5; border-left: 4px solid #ff6a00; padding: 16px; margin-bottom: 32px;">
+              <span style="color: #666666; font-size: 13px; text-transform: uppercase; letter-spacing: 0.5px;">Order Reference Number</span><br>
+              <strong style="color: #333333; font-size: 18px;">#${orderId}</strong>
+            </div>
+            
+            <h3 style="color: #333333; font-size: 16px; border-bottom: 2px solid #333333; padding-bottom: 8px; margin-bottom: 0;">
+              Out of Stock Items
+            </h3>
+            
+            <table width="100%" cellpadding="0" cellspacing="0" style="border-collapse: collapse; margin-bottom: 32px;">
+              ${itemsHtml}
+            </table>
+            
+            <div style="text-align: center; margin-bottom: 32px;">
+              <a href="${process.env.CLIENT_URL || 'http://localhost:3000'}/cart" style="background-color: #ff6a00; color: #ffffff; padding: 14px 32px; font-size: 16px; font-weight: bold; text-decoration: none; display: inline-block; border-radius: 4px;">
+                Return to Store
+              </a>
+            </div>
+            
+            <p style="color: #999999; font-size: 13px; line-height: 1.5; margin-top: 0; margin-bottom: 0; text-align: center;">
+              If you have any questions, simply reply to this email to reach our customer service team.<br>We are here to help!
+            </p>
+            
+          </div>
+          
+          <div style="background-color: #fafafa; padding: 20px; text-align: center; border-top: 1px solid #eeeeee;">
+            <p style="color: #b3b3b3; font-size: 12px; margin: 0;">
+              &copy; ${new Date().getFullYear()} My E-Commerce Store. All rights reserved.
+            </p>
+          </div>
+          
+        </div>
+      </div>
+      `,
+    });
+
+    console.log(`Failed order email sent successfully for Order ID: ${orderId}`);
+    return true; 
+  } catch (error) {
+    console.error("Error sending order failed email:", error);
+    return false;
+  }
+};
