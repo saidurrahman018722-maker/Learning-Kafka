@@ -52,6 +52,8 @@ export const connectConsumer = async () => {
                         console.log(`Order ${eventData.data.orderId} marked as PAID.`);
                        
                     }
+
+
                    if (eventData.type === 'PaymentProcessed' && topic === 'payment-events' && eventData.data.status === 'FAILED') {
                     const { orderId, userId } = eventData.data;
 
@@ -116,6 +118,8 @@ export const connectConsumer = async () => {
                             data: { status: "FAILED" } // or "CANCELLED"
                         });
                         console.log(`Order ${orderId} marked as FAILED due to inventory shortage.`);
+
+                        
 
                     }
                 }
