@@ -11,3 +11,26 @@ generator client {
 datasource db {
   provider = "postgresql"
 }
+enum PaymentStatus {
+  PENDING
+  SUCCESS
+  FAILED
+  REFUNDED
+}
+
+model Payment {
+  id                    String        @id @default(uuid())
+  orderId               String        
+  userId                String
+  total                 Float           
+  currency              String        @default("USD")
+  status                PaymentStatus @default(PENDING)
+  
+  // --- STRIPE SPECIFIC FIELDS ---
+  stripePaymentIntentId String?       @unique 
+  
+  // Timestamps
+  createdAt             DateTime      @default(now())
+  updatedAt             DateTime      @updatedAt
+
+}

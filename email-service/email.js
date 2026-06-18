@@ -166,3 +166,134 @@ export const sendOrderFailedForInventory = async (userEmail, userName, orderId, 
     return false;
   }
 };
+
+
+export const sendPaymentSuccessfulEmail = async (userEmail, orderId) => {
+  try {
+    const info = await transporter.sendMail({
+      from: `"My E-Commerce Store" <${process.env.EMAIL_USER}>`,
+      to: userEmail,
+      subject: `Payment Confirmed: Order #${orderId.substring(0, 8)}`,
+      text: `Great news! We have successfully received your payment for order #${orderId}. Our team is now preparing it for shipment.\n\nBest,\nThe Support Team`,
+      
+      // The Alibaba-inspired E-Commerce HTML Template
+      html: `
+      <div style="background-color: #f2f2f2; padding: 40px 20px; font-family: Arial, Helvetica, sans-serif;">
+        <div style="max-width: 600px; margin: 0 auto; background-color: #ffffff; overflow: hidden; border: 1px solid #e1e1e1;">
+          
+          <div style="background-color: #ff6a00; padding: 24px 40px; text-align: center;">
+            <h1 style="color: #ffffff; font-size: 24px; font-weight: bold; margin: 0; letter-spacing: 1px;">
+              PAYMENT CONFIRMED
+            </h1>
+          </div>
+          
+          <div style="padding: 40px;">
+            
+            <h2 style="color: #333333; font-size: 20px; font-weight: bold; margin-top: 0; margin-bottom: 16px;">
+              Thank you for your purchase!
+            </h2>
+            
+            <p style="color: #666666; font-size: 15px; line-height: 1.6; margin-top: 0; margin-bottom: 24px;">
+              Great news! We have successfully received your payment. Your order is now confirmed and our team is getting it ready for shipment.
+            </p>
+            
+            <div style="background-color: #fcf8f5; border-left: 4px solid #ff6a00; padding: 16px; margin-bottom: 32px;">
+              <span style="color: #666666; font-size: 13px; text-transform: uppercase; letter-spacing: 0.5px;">Order Reference Number</span><br>
+              <strong style="color: #333333; font-size: 18px;">#${orderId}</strong>
+            </div>
+            
+            <div style="text-align: center; margin-bottom: 32px;">
+              <a href="${process.env.CLIENT_URL || 'http://localhost:3000'}/orders/${orderId}" style="background-color: #ff6a00; color: #ffffff; padding: 14px 32px; font-size: 16px; font-weight: bold; text-decoration: none; display: inline-block; border-radius: 4px;">
+                View Order Status
+              </a>
+            </div>
+            
+            <p style="color: #999999; font-size: 13px; line-height: 1.5; margin-top: 0; margin-bottom: 0; text-align: center;">
+              If you have any questions, simply reply to this email to reach our customer service team.<br>We are here to help!
+            </p>
+            
+          </div>
+          
+          <div style="background-color: #fafafa; padding: 20px; text-align: center; border-top: 1px solid #eeeeee;">
+            <p style="color: #b3b3b3; font-size: 12px; margin: 0;">
+              &copy; ${new Date().getFullYear()} My E-Commerce Store. All rights reserved.
+            </p>
+          </div>
+          
+        </div>
+      </div>
+      `,
+    });
+
+    console.log(`Payment success email sent successfully for Order ID: ${orderId}`);
+    return true; 
+  } catch (error) {
+    console.error("Error sending payment success email:", error);
+    return false;
+  }
+};
+
+export const sendPaymentFailedEmail = async (userEmail, orderId) => {
+  try {
+    const info = await transporter.sendMail({
+      from: `"My E-Commerce Store" <${process.env.EMAIL_USER}>`,
+      to: userEmail,
+      subject: `Action Required: Payment Declined for Order #${orderId.substring(0, 8)}`,
+      text: `Hi there,\n\nUnfortunately, we were unable to process the payment for your recent order #${orderId}. Don't worry, your card has not been charged. Please update your payment method to complete your purchase.\n\nBest,\nThe Support Team`,
+      
+      // The Alibaba-inspired E-Commerce HTML Template
+      html: `
+      <div style="background-color: #f2f2f2; padding: 40px 20px; font-family: Arial, Helvetica, sans-serif;">
+        <div style="max-width: 600px; margin: 0 auto; background-color: #ffffff; overflow: hidden; border: 1px solid #e1e1e1;">
+          
+          <div style="background-color: #ff6a00; padding: 24px 40px; text-align: center;">
+            <h1 style="color: #ffffff; font-size: 24px; font-weight: bold; margin: 0; letter-spacing: 1px;">
+              PAYMENT DECLINED
+            </h1>
+          </div>
+          
+          <div style="padding: 40px;">
+            
+            <h2 style="color: #333333; font-size: 20px; font-weight: bold; margin-top: 0; margin-bottom: 16px;">
+              There was an issue with your payment.
+            </h2>
+            
+            <p style="color: #666666; font-size: 15px; line-height: 1.6; margin-top: 0; margin-bottom: 24px;">
+              Unfortunately, we were unable to process the payment for your recent order. <strong>Don't worry, your account has not been charged.</strong> To complete your purchase and secure your items, please update your payment method.
+            </p>
+            
+            <div style="background-color: #fcf8f5; border-left: 4px solid #ff6a00; padding: 16px; margin-bottom: 32px;">
+              <span style="color: #666666; font-size: 13px; text-transform: uppercase; letter-spacing: 0.5px;">Order Reference Number</span><br>
+              <strong style="color: #333333; font-size: 18px;">#${orderId}</strong>
+            </div>
+            
+            <div style="text-align: center; margin-bottom: 32px;">
+              <a href="${process.env.CLIENT_URL || 'http://localhost:3000'}/checkout/${orderId}" style="background-color: #ff6a00; color: #ffffff; padding: 14px 32px; font-size: 16px; font-weight: bold; text-decoration: none; display: inline-block; border-radius: 4px;">
+                Try Payment Again
+              </a>
+            </div>
+            
+            <p style="color: #999999; font-size: 13px; line-height: 1.5; margin-top: 0; margin-bottom: 0; text-align: center;">
+              If you have any questions, simply reply to this email to reach our customer service team.<br>We are here to help!
+            </p>
+            
+          </div>
+          
+          <div style="background-color: #fafafa; padding: 20px; text-align: center; border-top: 1px solid #eeeeee;">
+            <p style="color: #b3b3b3; font-size: 12px; margin: 0;">
+              &copy; ${new Date().getFullYear()} My E-Commerce Store. All rights reserved.
+            </p>
+          </div>
+          
+        </div>
+      </div>
+      `,
+    });
+
+    console.log(`Payment failed email sent successfully for Order ID: ${orderId}`);
+    return true; 
+  } catch (error) {
+    console.error("Error sending payment failed email:", error);
+    return false;
+  }
+};

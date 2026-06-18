@@ -30,7 +30,8 @@ export const createOrder = async (req,res)=>{
     }
     const payload_2 = {
         orderId:order.id,
-        
+        userId:req.user.id,
+        status:order.status,
         items: order.items.map(i => ({ productId: i.productId, quantity: i.quantity }))
     }
 
@@ -52,12 +53,6 @@ export const createOrder = async (req,res)=>{
 
     //we have to run a consumer to check in the inventory server has given us the green flag(it has appropeate amount of quantity) so now we can procced to payment
       
-
-
-
-
-
-
     try {
         await producer.send({
             topic:"go-to-payment",
@@ -75,4 +70,37 @@ export const createOrder = async (req,res)=>{
         message:"Order created successfully",
         order
     })
+}
+
+
+
+const getAllOrders = async (req,res)=>{
+    const orders = await prisma.order.findMany({
+        where:{
+            userId:req.user.id
+        },
+        include:{
+            items:true
+        }
+    })
+    res.status(200).json({
+        message:"Orders fetched successfully",
+        orders
+    })
+
+}
+
+
+const getOrderById = async (req,res)=>{
+    const {id} = req.params;
+    const order = await prisma.order.findUnique({
+        where:{
+            id,
+        }
+    })
+    res.status(200).json({
+        message:"Order fetched successfully",
+        order
+    })
+
 }

@@ -1,112 +1,150 @@
 import { Kafka } from "kafkajs";
-import { prisma } from "../config/bd.js"; // Note: ensure 'bd.js' isn't a typo for 'db.js'
+import { prisma } from "../config/db.js";
 
-// 1. Initialize Kafka (Changed clientId to match the service)
 const kafka = new Kafka({
   clientId: "inventory-service",
   brokers: ["localhost:9092"]
 });
 
 export const producer = kafka.producer();
-export const consumer = kafka.consumer({ groupId: "inventory-service-group" });
 
-// 2. Connect Producer
+// 1. Two separate consumers with distinct group IDs
+export const reserveConsumer = kafka.consumer({ groupId: "inventory-reserve-group" });
+export const restockConsumer = kafka.consumer({ groupId: "inventory-restock-group" });
+
 export const connectProducer = async () => {
   try {
     await producer.connect();
-    console.log("Producer connected to the Kafka server");
+    console.log("Inventory Producer connected to Kafka");
   } catch (err) {
-    console.log("Error connecting Producer to the Kafka server", err);
+    console.log("Error connecting Producer:", err);
   }
 };
 
-// 3. Connect Consumer and Listen
 export const connectConsumer = async () => {
   try {
-    await consumer.connect();
-    console.log("Consumer connected to the Kafka server");
+    await reserveConsumer.connect();
+    await restockConsumer.connect();
+    console.log("Inventory Consumers connected to Kafka");
 
-    await consumer.subscribe({ topic: "order-created", fromBeginning: true });
+    // 2. Subscribe them to their specific topics
+    await reserveConsumer.subscribe({ topic: "order-created", fromBeginning: true });
+    await restockConsumer.subscribe({ topic: "order-events", fromBeginning: true });
 
-    await consumer.run({
-      eachMessage: async ({ topic, partition, message }) => {
-        const rowData = message.value.toString();
-        
-        // FIX #1: Renamed variable to 'eventData' to match your code below
-        const eventData = JSON.parse(rowData);
+    // 3. Run them concurrently
+    await Promise.all([
+      
+      // ==========================================
+      // CONSUMER 1: RESERVE INVENTORY
+      // ==========================================
+      reserveConsumer.run({
+        eachMessage: async ({ message }) => {
+          const eventData = JSON.parse(message.value.toString());
 
-        if (eventData.type === 'OrderCreated' && topic === 'order-created') {
-          try {
-            // Step A: Fetch current stock for all items in the order
-            const productIds = eventData.items.map(item => parseInt(item.productId));
-            const productsInDb = await prisma.product.findMany({
-              where: { id: { in: productIds } }
-            });
+          if (eventData.type === 'OrderCreated') {
+            try {
+              const productIds = eventData.items.map(item => parseInt(item.productId));
+              const productsInDb = await prisma.product.findMany({
+                where: { id: { in: productIds } }
+              });
 
-            // Step B: Cross-reference requested quantity vs actual stock
-            const failedItems = [];
-            for (const reqItem of eventData.items) {
-              const dbProduct = productsInDb.find(p => p.id === parseInt(reqItem.productId));
-              
-              // If product doesn't exist OR stock is too low, flag it!
-              if (!dbProduct || dbProduct.stockQuantity < reqItem.quantity) {
-                failedItems.push({
-                  productId: reqItem.productId,
-                  requested: reqItem.quantity,
-                  available: dbProduct ? dbProduct.stockQuantity : 0
-                });
+              const failedItems = [];
+              for (const reqItem of eventData.items) {
+                const dbProduct = productsInDb.find(p => p.id === parseInt(reqItem.productId));
+                if (!dbProduct || dbProduct.stockQuantity < reqItem.quantity) {
+                  failedItems.push({
+                    productId: reqItem.productId,
+                    requested: reqItem.quantity,
+                    available: dbProduct ? dbProduct.stockQuantity : 0
+                  });
+                }
               }
-            }
 
-            // Step C: If any items failed, abort and send the exact failed items to Kafka
-            if (failedItems.length > 0) {
-              console.log(`Order ${eventData.orderId} failed. Out of stock items:`, failedItems);
-              
+              if (failedItems.length > 0) {
+                console.log(`Order ${eventData.orderId} failed. Out of stock items:`, failedItems);
+                await producer.send({
+                  topic: 'inventory-events',
+                  messages: [{ 
+                    key: eventData.orderId, 
+                    value: JSON.stringify({ 
+                      type: 'InventoryFailed', 
+                      data: { orderId: eventData.orderId, userId: eventData.userId, failedItems: failedItems } 
+                    }) 
+                  }]
+                });
+                return; 
+              }
+
+              // DECREMENT STOCK
+              await prisma.$transaction(
+                eventData.items.map(item => 
+                  prisma.product.update({
+                    where: { id: parseInt(item.productId) },
+                    data: { stockQuantity: { decrement: item.quantity } }
+                  })
+                )
+              );
+
+              console.log(`Successfully reserved inventory for Order: ${eventData.orderId}`);
               await producer.send({
-                topic: 'inventory-events',
-                messages: [{ 
-                  value: JSON.stringify({ 
-                    type: 'InventoryFailed', 
-                    data: { orderId: eventData.orderId, failedItems: failedItems } 
-                  }) 
+                topic: 'start-payment',
+                messages: [{
+                  value: JSON.stringify({
+                    type: 'StartingPayment',
+                    data: { orderId: eventData.orderId, userId: eventData.userId, status: "RESERVED" }
+                  })
                 }]
               });
-              
-              return; // EXIT EARLY: Do not proceed to update anything!
+
+            } catch (error) {
+              console.error(`Error processing inventory reservation:`, error);
+              throw error; 
+            }
+          }
+        }
+      }),
+
+      // ==========================================
+      // CONSUMER 2: RESTOCK INVENTORY (COMPENSATING TRANSACTION)
+      // ==========================================
+      restockConsumer.run({
+        eachMessage: async ({ message }) => {
+          const eventData = JSON.parse(message.value.toString());
+
+          if (eventData.type === 'OrderCancelled' && topic === 'order-events' && eventData.data.reason === 'PAYMENT_FAILED') {
+          try {
+            const { orderId, items } = eventData.data;
+
+            // Safety check: Make sure items were actually provided
+            if (!items || items.length === 0) {
+              console.warn(`OrderCancelled event for ${orderId} is missing items to restock.`);
+              return; 
             }
 
-            // Step D: ALL items have enough stock! Proceed with transaction.
+            console.log(`Payment failed for Order ${orderId}. Restocking inventory...`);
+
             await prisma.$transaction(
-              eventData.items.map(item => 
+              items.map(item => 
                 prisma.product.update({
                   where: { id: parseInt(item.productId) },
-                  data: { stockQuantity: { decrement: item.quantity } }
+                  data: { stockQuantity: { increment: item.quantity } }
                 })
               )
             );
 
-            // FIX #2: ADDED THE MISSING SUCCESS EVENT
-            // If the transaction succeeds, we MUST tell the Payment Service to continue!
-            console.log(`Successfully reserved inventory for Order: ${eventData.orderId}`);
-            await producer.send({
-              topic: 'inventory-events',
-              messages: [{
-                value: JSON.stringify({
-                  type: 'InventoryReserved',
-                  data: { orderId: eventData.orderId, status: "RESERVED" }
-                })
-              }]
-            });
+            console.log(`Successfully restocked inventory for cancelled Order: ${orderId}`);
 
           } catch (error) {
-            // This catches any Prisma database crashes
-            console.error(`Error processing inventory for order ${eventData.orderId}:`, error);
+            console.error(`Error restocking inventory for order ${eventData.data.orderId}:`, error);
+            throw error; 
           }
         }
-      }
-    });
+        }
+      })
+
+    ]);
+
   } catch (error) {
-    // FIX #3: Fixed bracket structure so this catches top-level consumer connection errors
-    console.error("Error connecting Consumer to the Kafka server", error);
+    console.error("Error connecting Inventory Consumers:", error);
   }
 };
