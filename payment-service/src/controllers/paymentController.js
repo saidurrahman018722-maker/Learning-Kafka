@@ -6,26 +6,30 @@ import {paymentConsumer} from "../utils/kafka.js";
 
 export const createIntent = async (req, res) => {
   try {
-        paymentConsumer.run({
-            eachMessage: async ({ topic, partition, message }) => {
-                const eventData = JSON.parse(message.value.toString());
+        // paymentConsumer.run({
+        //     eachMessage: async ({ topic, partition, message }) => {
+        //         const eventData = JSON.parse(message.value.toString());
 
-                if(eventData.type === "StartingPayment" && eventData.data.status === "RESERVED"){
-                    const { orderId } = eventData.data;
-                    console.log(`\nProcessing payment for Order: ${orderId}...`);
+        //         if(eventData.type === "StartingPayment" && eventData.data.status === "RESERVED"){
+        //             const { orderId } = eventData.data;
+        //             console.log(`\nProcessing payment for Order: ${orderId}...`);
     
+        const {orderId} = req.body;
+        let token;
+        if(req.headers.authorization && req.headers.authorization.startsWith("Bearer")){
+          token = req.headers.authorization.split(" ")[1];
+        }
 
-
-        const clientSecret = await paymentService.initiatePayment(orderId,req.user.id);
+        const clientSecret = await paymentService.initiatePayment(orderId,req.user.id,token);
 
         return res.status(200).json({
         success: true,
         clientSecret,
         });
 
-    }
-            }
-        })
+   // }
+        //    }
+       // })
 
   } catch (error) {
     return res.status(error.message === 'Order not found' ? 404 : 500).json({

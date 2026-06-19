@@ -1,5 +1,5 @@
-import { prisma } from "./config/db.js";
-import { consumer,producer } from "../utils/kafka.js";
+import { prisma } from "../config/db.js";
+import { producer } from "../utils/kafka.js";
 
 
 export const createOrder = async (req,res)=>{
@@ -74,7 +74,7 @@ export const createOrder = async (req,res)=>{
 
 
 
-const getAllOrders = async (req,res)=>{
+export const getAllOrders = async (req,res)=>{
     const orders = await prisma.order.findMany({
         where:{
             userId:req.user.id
@@ -91,7 +91,7 @@ const getAllOrders = async (req,res)=>{
 }
 
 
-const getOrderById = async (req,res)=>{
+export const getOrderById = async (req,res)=>{
     const {id} = req.params;
     const order = await prisma.order.findUnique({
         where:{
@@ -102,5 +102,6 @@ const getOrderById = async (req,res)=>{
         message:"Order fetched successfully",
         order
     })
+    return order;
 
 }

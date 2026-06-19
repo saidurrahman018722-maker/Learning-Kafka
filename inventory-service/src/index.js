@@ -1,6 +1,7 @@
 import express from "express"
 import {config} from "dotenv"
-import { connectProducer,connectConsumer } from "./src/utils/kafka.js"
+import { connectProducer,connectConsumer } from "./utils/kafka.js"
+import productRoutes from "./routes/productRoutes.js"
 
 config()
 const app = express()

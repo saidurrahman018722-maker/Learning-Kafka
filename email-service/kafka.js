@@ -45,7 +45,7 @@ export const connectConsumer = async () => {
                 }
             }),
 
-            // --- CONSUMER 2: INVENTORY FAILED EMAILS ---
+            // --- CONSUMER 2: INVENTORY FAILED EMAILS ---~
             inventoryConsumer.run({
                 eachMessage: async ({ topic, partition, message }) => {
                     try {

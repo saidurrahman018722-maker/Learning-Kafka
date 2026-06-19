@@ -3,17 +3,20 @@ import { prisma } from "../config/db.js";
 import { producer } from "../utils/kafka.js"; // Import your Kafka producer!
 
 class PaymentService {
-  async initiatePayment(orderId,userId) {
+  async initiatePayment(orderId,userId,token) {
     const stripe = new Stripe(process.env.STRIPE_SECRET_KEY);
     
     // FIX: Proper fetch request
-    const response = await fetch(`${process.env.ORDER_SERVICE_URL}/order/${orderId}`);
-    if (!response.ok) {
-      throw new Error('Order not found');
-    }
+    const response = await fetch(`${process.env.ORDER_SERVICE_URL}/order/get-order/${orderId}`, {
+        method: "GET",
+        headers: {
+            "Authorization": `Bearer ${token}`, // <-- Forward the token!
+            "Content-Type": "application/json"
+        }
+    });
     const order = await response.json();
 
-    const stripeAmount = Math.round(order.total * 100);
+    const stripeAmount = Math.round(order.order.total * 100);
 
     const paymentIntent = await stripe.paymentIntents.create({
       amount: stripeAmount,
@@ -22,15 +25,15 @@ class PaymentService {
         enabled: true,
         allow_redirects: 'never',
       },
-      metadata: { orderId: order.id }, 
+      metadata: { orderId: order.order.id }, 
     });
 
     await prisma.payment.create({
       data: {
-        orderId: order.id,
+        orderId: order.order.id,
         userId:userId,
-        amount: stripeAmount,
-        currency: 'usd',
+        total: stripeAmount,
+        currency: 'USD',
         stripePaymentIntentId: paymentIntent.id,
         status: 'PENDING',
       },

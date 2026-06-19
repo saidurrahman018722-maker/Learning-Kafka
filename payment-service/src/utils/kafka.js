@@ -24,7 +24,7 @@ export const connectConsumer = async () => {
         console.log("Payment Consumer connected to Kafka");
 
         // The Payment Service waits for the Inventory to be successfully reserved
-        await consumer.subscribe({ topic: "start-payment", fromBeginning: true });
+        await paymentConsumer.subscribe({ topic: "start-payment", fromBeginning: true });
 
     } catch (error) {
         console.error("Error connecting Payment Consumer:", error);

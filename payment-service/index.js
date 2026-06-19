@@ -6,8 +6,9 @@ import { connectProducer } from "./src/utils/kafka.js";
 import { connectConsumer } from "./src/utils/kafka.js";
 
 config();
+connectDB();
 const app = express();
-app.use("/",paymentRoutes);
+app.use("/payment",paymentRoutes);
 app.use(express.json());
 app.use(express.urlencoded({extended:true}));
 

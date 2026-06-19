@@ -9,7 +9,7 @@ import { authMiddleware } from "../middlewares/authMiddleware.js";
 
 const router = express.Router();
 
-router.patch('/create-intent',express.json(),authMiddleware,validateRequest(PaymentSchema),createIntent);
+router.post('/create-intent',express.json(),authMiddleware,validateRequest(PaymentSchema),createIntent);
 router.post('/webhook', express.raw({ type: 'application/json' }), handleWebhook);
 
 export default router;

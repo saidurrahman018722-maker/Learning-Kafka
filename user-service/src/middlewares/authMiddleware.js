@@ -1,5 +1,5 @@
 import {prisma} from "../config/db.js";
-
+import jwt from "jsonwebtoken"
 
 export const authMiddleware = async (req,res,next)=>{
     try{
@@ -11,7 +11,7 @@ export const authMiddleware = async (req,res,next)=>{
     const user = await prisma.user.findUnique({
         where:{
             id:decoded.id,
-            sessionRevoked:false
+            sessionRevoked:decoded.sessionRevoked
         }
     });
     if(!user){

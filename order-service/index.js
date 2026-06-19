@@ -1,10 +1,12 @@
 import express from "express"
 import {config} from "dotenv"
+import { connectDB } from "./src/config/db.js"
 import { connectProducer,connectConsumer } from "./src/utils/kafka.js"
-import orderRoutes from "./routes/orderRoutes.js"
+import orderRoutes from "./src/routes/orderRoutes.js"
 
 
 config()
+connectDB();
 const app = express()
 app.use(express.json())
 app.use(express.urlencoded({extended:true}))
