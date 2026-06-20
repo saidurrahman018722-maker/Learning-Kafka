@@ -17,6 +17,7 @@ enum Status {
   SHIPPED
   DELIVERED
   FAILED
+  PAID
 }
 model Order {
   id        String      @id @default(uuid())

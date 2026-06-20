@@ -37,19 +37,29 @@ export const connectConsumer = async () => {
       // ==========================================
       // CONSUMER 1: RESERVE INVENTORY
       // ==========================================
-      reserveConsumer.run({
+     reserveConsumer.run({
         eachMessage: async ({ message }) => {
           const eventData = JSON.parse(message.value.toString());
 
           if (eventData.type === 'OrderCreated') {
             try {
-              const productIds = eventData.items.map(item => parseInt(item.productId));
+              // 1. Properly extract the nested data payload
+              const { orderId, userId, items,token } = eventData.data;
+
+              // 2. Safety Check: Stop immediately if the items array is missing
+              if (!items || !Array.isArray(items)) {
+                  console.error(` OrderCreated event missing items array for Order: ${orderId}`);
+                  return;
+              }
+
+              // 3. Map over the correctly extracted 'items'
+              const productIds = items.map(item => parseInt(item.productId));
               const productsInDb = await prisma.product.findMany({
                 where: { id: { in: productIds } }
               });
 
               const failedItems = [];
-              for (const reqItem of eventData.items) {
+              for (const reqItem of items) { 
                 const dbProduct = productsInDb.find(p => p.id === parseInt(reqItem.productId));
                 if (!dbProduct || dbProduct.stockQuantity < reqItem.quantity) {
                   failedItems.push({
@@ -61,14 +71,14 @@ export const connectConsumer = async () => {
               }
 
               if (failedItems.length > 0) {
-                console.log(`Order ${eventData.orderId} failed. Out of stock items:`, failedItems);
+                console.log(`Order ${orderId} failed. Out of stock items:`, failedItems);
                 await producer.send({
                   topic: 'inventory-events',
                   messages: [{ 
-                    key: eventData.orderId, 
+                    key: orderId, 
                     value: JSON.stringify({ 
                       type: 'InventoryFailed', 
-                      data: { orderId: eventData.orderId, userId: eventData.userId, failedItems: failedItems } 
+                      data: { orderId: orderId, userId: userId, failedItems: failedItems,token } 
                     }) 
                   }]
                 });
@@ -77,7 +87,7 @@ export const connectConsumer = async () => {
 
               // DECREMENT STOCK
               await prisma.$transaction(
-                eventData.items.map(item => 
+                items.map(item => 
                   prisma.product.update({
                     where: { id: parseInt(item.productId) },
                     data: { stockQuantity: { decrement: item.quantity } }
@@ -85,13 +95,13 @@ export const connectConsumer = async () => {
                 )
               );
 
-              console.log(`Successfully reserved inventory for Order: ${eventData.orderId}`);
+              console.log(`Successfully reserved inventory for Order: ${orderId}`);
               await producer.send({
                 topic: 'start-payment',
                 messages: [{
                   value: JSON.stringify({
                     type: 'StartingPayment',
-                    data: { orderId: eventData.orderId, userId: eventData.userId, status: "RESERVED" }
+                    data: { orderId: orderId, userId: userId, status: "RESERVED" }
                   })
                 }]
               });

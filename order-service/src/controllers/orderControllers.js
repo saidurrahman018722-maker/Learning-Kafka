@@ -4,6 +4,10 @@ import { producer } from "../utils/kafka.js";
 
 export const createOrder = async (req,res)=>{
     const {total,items} = req.body;
+    let token;
+    if(req.headers.authorization && req.headers.authorization.startsWith("Bearer")){
+        token = req.headers.authorization.split(" ")[1]
+    }
     const order = await prisma.order.create({
     data: {
         total,
@@ -32,6 +36,7 @@ export const createOrder = async (req,res)=>{
         orderId:order.id,
         userId:req.user.id,
         status:order.status,
+        token:token,
         items: order.items.map(i => ({ productId: i.productId, quantity: i.quantity }))
     }
 

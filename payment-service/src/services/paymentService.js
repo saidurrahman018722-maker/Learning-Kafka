@@ -8,13 +8,12 @@ class PaymentService {
     
     // FIX: Proper fetch request
     const response = await fetch(`${process.env.ORDER_SERVICE_URL}/order/get-order/${orderId}`, {
-        method: "GET",
         headers: {
-            "Authorization": `Bearer ${token}`, // <-- Forward the token!
-            "Content-Type": "application/json"
+           'Authorization': `Bearer ${token}`, // <-- Forward the token!
         }
     });
     const order = await response.json();
+    console.log(order);
 
     const stripeAmount = Math.round(order.order.total * 100);
 
@@ -25,7 +24,10 @@ class PaymentService {
         enabled: true,
         allow_redirects: 'never',
       },
-      metadata: { orderId: order.order.id }, 
+      metadata: { orderId: order.order.id,
+        userId:userId,
+        token:token
+       }, 
     });
 
     await prisma.payment.create({
@@ -43,7 +45,7 @@ class PaymentService {
   }
 
   // 2. Handle SUCCESS
-  async handleSuccessfulPayment(paymentIntentId) {
+  async handleSuccessfulPayment(paymentIntentId,token) {
     const payment = await prisma.payment.findUnique({
       where: { stripePaymentIntentId: paymentIntentId },
     });
@@ -53,7 +55,7 @@ class PaymentService {
 
     await prisma.payment.update({
       where: { stripePaymentIntentId: paymentIntentId },
-      data: { status: 'SUCCESS' },
+      data: { status: 'PAID' },
     });
 
     // B. Tell Kafka the payment succeeded!
@@ -62,7 +64,7 @@ class PaymentService {
       messages: [{
         value: JSON.stringify({
           type: 'PaymentProcessed',
-          data: { orderId: payment.orderId, userId:payment.userId, status: 'SUCCESS' }
+          data: { orderId: payment.orderId, userId:payment.userId, status: 'PAID',token }
         })
       }]
     });
@@ -70,7 +72,7 @@ class PaymentService {
   }
 
   // 3. Handle FAILURE
-  async handleFailedPayment(paymentIntentId) {
+  async handleFailedPayment(paymentIntentId,token) {
     // A. Fetch the payment first so we know the orderId!
     const payment = await prisma.payment.findUnique({
       where: { stripePaymentIntentId: paymentIntentId },
@@ -91,7 +93,7 @@ class PaymentService {
       messages: [{
         value: JSON.stringify({
           type: 'PaymentProcessed',
-          data: { orderId: payment.orderId,userId:payment.userId, status: 'FAILED' }
+          data: { orderId: payment.orderId,userId:payment.userId, status: 'FAILED',token }
         })
       }]
     });

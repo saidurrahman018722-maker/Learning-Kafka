@@ -13,7 +13,7 @@ datasource db {
 }
 enum PaymentStatus {
   PENDING
-  SUCCESS
+  PAID
   FAILED
   REFUNDED
 }
